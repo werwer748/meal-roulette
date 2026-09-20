@@ -6,3 +6,7 @@ dist/
 
 # macOS
 .DS_Store
+
+# Claude Code 로컬 설정 — 마켓플레이스 경로가 머신마다 다르다.
+# 설치 방법은 plugins/vanilla-web-review/README.md 참고.
+.claude/settings.json

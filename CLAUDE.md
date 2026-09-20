@@ -127,5 +127,9 @@ claude plugin install vanilla-web-review@hugo-web --scope project
 claude plugin details vanilla-web-review     # Skills 1 / Agents 1 / Hooks 1 인지 확인
 ```
 
+설치 상태는 `.claude/settings.json`에 기록되는데 이 파일은 **git에서 제외돼 있다** —
+마켓플레이스 경로가 절대 경로라 머신마다 다르기 때문이다. 클론 직후에는 플러그인이 붙어 있지
+않으므로 `plugins/vanilla-web-review/README.md`의 설치 두 줄을 먼저 실행해야 리뷰와 커밋 게이트가 작동한다.
+
 훅은 검사 스크립트를 `$VANILLA_WEB_CHECK` → `scripts/check.sh` → `check.sh` 순으로 찾고,
 없으면 통과시킨다. 그래서 다른 프로젝트에 깔아도 안전하다.

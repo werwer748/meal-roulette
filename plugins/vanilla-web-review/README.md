@@ -6,6 +6,51 @@
 React가 막아주던 XSS, 번들러가 잡아주던 문법 오류, 상태 관리 라이브러리가 강제하던 단방향 흐름이
 전부 사람 몫인 환경에서 그 빈자리를 메우는 게 목적이다.
 
+## 설치
+
+이 저장소를 마켓플레이스로 등록한 뒤 설치한다. 저장소 루트(`.claude-plugin/marketplace.json`이
+있는 곳)에서 실행한다.
+
+```bash
+claude plugin marketplace add ./ --scope project
+claude plugin install vanilla-web-review@hugo-web --scope project
+```
+
+설치 결과는 `.claude/settings.json`에 기록되는데, **이 파일은 `.gitignore` 대상이다** —
+마켓플레이스 경로가 절대 경로로 들어가 머신마다 달라지기 때문이다. 그래서 클론한 사람은
+위 두 줄을 직접 한 번 실행해야 한다.
+
+제대로 붙었는지 확인:
+
+```bash
+claude plugin details vanilla-web-review     # Skills 1 / Agents 1 / Hooks 1
+claude plugin list                           # Status: ✔ enabled
+```
+
+`Status: ✘ failed to load`가 뜨면 오류 메시지를 그대로 읽는다. 대개 `plugin.json`에
+`skills`·`agents`·`hooks` 키를 적어서 생기는 충돌이다 — 관례 경로는 자동으로 로드되므로
+그 키들을 두면 안 된다.
+
+다른 프로젝트에서 쓰려면 이 저장소 경로를 그대로 가리키면 된다.
+
+```bash
+claude plugin marketplace add /path/to/meal-roulette --scope user
+claude plugin install vanilla-web-review@hugo-web --scope user
+```
+
+`--scope user`로 깔면 모든 프로젝트에서 로드된다. 검사 스크립트가 없는 프로젝트에서는
+훅이 그냥 통과하므로(아래 [커밋 훅](#커밋-훅) 참고) 부작용이 없다.
+
+### 고친 뒤 반영하기
+
+설치할 때 `~/.claude/plugins/cache/` 로 **복사**되므로, 소스를 고쳐도 재설치 전에는 반영되지 않는다.
+
+```bash
+claude plugin validate ./plugins/vanilla-web-review
+claude plugin uninstall vanilla-web-review --scope project
+claude plugin install vanilla-web-review@hugo-web --scope project
+```
+
 ## 구성
 
 | 종류 | 이름 | 하는 일 |
