@@ -1,0 +1,8 @@
+# 빌드 산출물
+dist/
+
+# IDE
+.idea/
+
+# macOS
+.DS_Store

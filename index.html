@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>랜덤 식단 룰렛</title>
+<style>
+/* ── 색 토큰 ─────────────────────────────────────────── */
+:root{
+  --bg:#f6f4ef; --surface:#fff; --surface-2:#f1eee7; --text:#23201a; --muted:#6f6a5f;
+  --line:#e2ddd2; --accent:#e0562d; --accent-text:#fff;
+  --danger:#c0392b; --ok:#2f7a4f;
+  --shadow:0 10px 30px rgba(35,32,26,.10);
+  --radius:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16151a; --surface:#1f1e26; --surface-2:#282730; --text:#eceaf2; --muted:#a29eae;
+    --line:#35333f; --accent:#ff6a3d; --accent-text:#1a1208;
+    --danger:#ff7a6b; --ok:#57c98a;
+    --shadow:0 10px 30px rgba(0,0,0,.45);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text); min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{max-width:1100px;margin:0 auto;padding:24px 16px 48px}
+header.top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+header.top h1{font-size:22px;margin:0;letter-spacing:-.02em}
+header.top .sub{color:var(--muted);font-size:13px}
+
+.layout{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+@media (max-width:900px){ .layout{grid-template-columns:1fr} }
+
+/* ── 룰렛 ────────────────────────────────────────────── */
+.stage{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:24px 20px 26px;display:flex;flex-direction:column;
+  align-items:center;gap:16px;
+}
+.wheel-wrap{position:relative;width:clamp(260px,60vmin,440px);aspect-ratio:1/1}
+.wheel-wrap canvas{width:100%;height:100%;display:block;transform-origin:50% 50%;border-radius:50%}
+.pointer{
+  position:absolute;top:-6px;left:50%;transform:translateX(-50%);z-index:3;
+  width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;
+  border-top:24px solid var(--accent);filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));
+}
+.hub{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2;
+  width:16%;height:16%;border-radius:50%;background:var(--surface);
+  border:3px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.2);
+}
+.stage-msg{margin:0;color:var(--muted);font-size:13px;text-align:center;min-height:19px}
+.stage-msg.warn{color:var(--accent)}
+.spin-btn{
+  border:none;background:var(--accent);color:var(--accent-text);
+  padding:14px 44px;border-radius:999px;font-size:17px;font-weight:700;letter-spacing:-.01em;
+  box-shadow:0 6px 18px rgba(224,86,45,.32);transition:transform .12s ease,opacity .2s ease;
+}
+.spin-btn:hover:not(:disabled){transform:translateY(-1px)}
+.spin-btn:active:not(:disabled){transform:translateY(1px)}
+.spin-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+
+/* ── 사이드 패널 ─────────────────────────────────────── */
+.panel{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.panel.busy{opacity:.55;pointer-events:none}
+.tabs{display:flex;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.tabs button{
+  flex:1;border:none;background:none;padding:12px 8px;font-size:14px;font-weight:600;
+  color:var(--muted);border-bottom:2px solid transparent;
+}
+.tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent);background:var(--surface)}
+.tabpanel{padding:16px;max-height:min(70vh,620px);overflow-y:auto}
+.tabpanel[hidden]{display:none}
+
+h2.sec{font-size:12px;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;text-transform:uppercase}
+h2.sec + .row, h2.sec + .list{margin-top:0}
+.sec-gap{margin-top:22px}
+
+.cats{display:flex;flex-wrap:wrap;gap:8px}
+.cat{
+  display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);
+  border-radius:999px;padding:7px 12px;font-size:13px;background:var(--surface-2);cursor:pointer;
+  user-select:none;
+}
+.cat input{margin:0;accent-color:var(--accent)}
+.cat .cnt{color:var(--muted);font-size:12px}
+.cat:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+
+.row{display:flex;align-items:center;gap:8px;margin:12px 0}
+.row label{font-size:13px;flex:0 0 auto}
+.row .val{margin-left:auto;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+input[type="range"]{width:100%;accent-color:var(--accent)}
+.hint{font-size:12px;color:var(--muted);line-height:1.5;margin:6px 0 0}
+
+.count-badge{
+  display:inline-block;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;font-size:13px;width:100%;text-align:center;
+}
+.count-badge b{font-size:15px}
+
+.field{display:flex;gap:6px;margin-bottom:10px}
+.field input[type="text"],.field select,.search{
+  border:1px solid var(--line);background:var(--surface-2);border-radius:10px;
+  padding:9px 10px;font-size:14px;min-width:0;
+}
+.field input[type="text"]{flex:1}
+.field select{flex:0 0 92px}
+.search{width:100%;margin-bottom:10px}
+.btn{
+  border:1px solid var(--line);background:var(--surface-2);border-radius:10px;
+  padding:9px 12px;font-size:13px;font-weight:600;white-space:nowrap;
+}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-text);border-color:transparent}
+.btn.ghost{background:none}
+.btn.armed{border-color:var(--danger);color:var(--danger)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+.list{list-style:none;margin:0;padding:0}
+.group-title{font-size:12px;font-weight:700;color:var(--muted);margin:14px 0 6px}
+.group-title:first-child{margin-top:0}
+.item{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);
+  border-radius:10px;margin-bottom:6px;font-size:14px;background:var(--surface-2);
+}
+.item .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .when{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.item .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:2px 6px;background:var(--surface)}
+.item .del{border:none;background:none;color:var(--muted);font-size:16px;line-height:1;padding:2px 4px;border-radius:6px}
+.item .del:hover{color:var(--danger)}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:24px 8px;line-height:1.6}
+
+/* ── 결과 모달 ───────────────────────────────────────── */
+.modal{
+  position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+  background:rgba(20,18,16,.5);padding:16px;backdrop-filter:blur(2px);
+}
+.modal[hidden]{display:none}
+.modal-card{
+  background:var(--surface);border-radius:20px;box-shadow:var(--shadow);padding:28px 24px 22px;
+  width:min(360px,100%);text-align:center;border:1px solid var(--line);
+  animation:pop .22s cubic-bezier(.2,.9,.3,1.3);
+}
+@keyframes pop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){ .modal-card{animation:none} }
+.modal-card .kicker{font-size:13px;color:var(--muted);margin:0 0 6px}
+.modal-card .winner{font-size:30px;font-weight:800;margin:0 0 10px;letter-spacing:-.02em;word-break:keep-all}
+.modal-card .tag{display:inline-block;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;margin-bottom:20px}
+.modal-actions{display:flex;gap:8px}
+.modal-actions .btn{flex:1;padding:12px}
+
+#toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(12px);
+  background:var(--text);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:13px;
+  box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;z-index:60;
+  max-width:calc(100vw - 32px);text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>🍽️ 랜덤 식단 룰렛</h1>
+    <span class="sub">오늘 뭐 먹지? 고민은 룰렛한테 맡기세요.</span>
+  </header>
+
+  <main class="layout">
+    <!-- 룰렛 -->
+    <section class="stage">
+      <div class="wheel-wrap">
+        <div class="pointer" aria-hidden="true"></div>
+        <canvas id="wheel" role="img" aria-label="메뉴 룰렛"></canvas>
+        <div class="hub" aria-hidden="true"></div>
+      </div>
+      <p id="stage-msg" class="stage-msg" aria-live="polite"></p>
+      <button id="spin-btn" class="spin-btn" type="button">돌리기</button>
+    </section>
+
+    <!-- 사이드 패널 -->
+    <aside class="panel" id="panel">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-btn-filter"  aria-controls="tab-filter"  aria-selected="true"  data-tab="filter">필터</button>
+        <button role="tab" id="tab-btn-menu"    aria-controls="tab-menu"    aria-selected="false" data-tab="menu">메뉴</button>
+        <button role="tab" id="tab-btn-history" aria-controls="tab-history" aria-selected="false" data-tab="history">기록</button>
+      </div>
+
+      <div class="tabpanel" id="tab-filter" role="tabpanel" aria-labelledby="tab-btn-filter">
+        <h2 class="sec">카테고리</h2>
+        <div class="cats" id="cat-list"></div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn ghost" type="button" id="cat-all">전체 선택</button>
+          <button class="btn ghost" type="button" id="cat-none">전체 해제</button>
+        </div>
+
+        <div class="sec-gap"></div>
+        <div id="candidate-count" class="count-badge"></div>
+
+        <div class="sec-gap"></div>
+        <h2 class="sec">규칙</h2>
+        <div class="row">
+          <label for="ex-recent">최근 뽑은 메뉴 제외</label>
+          <span class="val"><span id="ex-recent-val">3</span>회</span>
+        </div>
+        <input type="range" id="ex-recent" min="0" max="10" step="1">
+        <p class="hint">0이면 제외하지 않아요. 제외하고 나면 후보가 없어질 경우 자동으로 완화됩니다.</p>
+
+        <div class="row" style="margin-top:18px">
+          <label for="slots">원판에 올릴 조각 수</label>
+          <span class="val"><span id="slots-val">10</span>개</span>
+        </div>
+        <input type="range" id="slots" min="8" max="12" step="1">
+        <p class="hint">후보가 더 많으면 매번 무작위로 이만큼만 원판에 올라와요. 그래도 모든 후보의 당첨 확률은 똑같습니다.</p>
+      </div>
+
+      <div class="tabpanel" id="tab-menu" role="tabpanel" aria-labelledby="tab-btn-menu" hidden>
+        <h2 class="sec">메뉴 추가</h2>
+        <div class="field">
+          <input type="text" id="new-name" placeholder="메뉴 이름" maxlength="20" autocomplete="off">
+          <select id="new-cat"></select>
+          <button class="btn primary" type="button" id="add-menu">추가</button>
+        </div>
+        <input type="text" class="search" id="menu-search" placeholder="메뉴 검색" autocomplete="off">
+        <div id="menu-list"></div>
+        <div class="btn-row" style="margin-top:14px">
+          <button class="btn ghost" type="button" id="reset-menus">기본 목록으로 되돌리기</button>
+        </div>
+      </div>
+
+      <div class="tabpanel" id="tab-history" role="tabpanel" aria-labelledby="tab-btn-history" hidden>
+        <h2 class="sec">먹은 기록</h2>
+        <div id="history-list"></div>
+        <div class="btn-row" style="margin-top:14px">
+          <button class="btn ghost" type="button" id="clear-history">기록 전체 지우기</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="modal" id="result-modal" role="dialog" aria-modal="true" aria-labelledby="winner-name" hidden>
+  <div class="modal-card">
+    <p class="kicker">오늘의 한 끼는</p>
+    <p class="winner" id="winner-name" aria-live="polite">—</p>
+    <span class="tag" id="winner-cat">—</span>
+    <div class="modal-actions">
+      <button class="btn ghost" type="button" id="respin-btn">다시 돌리기</button>
+      <button class="btn primary" type="button" id="confirm-btn">이거 먹을래</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ══ 1. 기본 데이터 ══════════════════════════════════════ */
+const CATEGORIES = ['한식','중식','일식','양식','분식','아시안','기타'];
+const SEED = [
+  ['김치찌개','한식'],['비빔밥','한식'],['제육볶음','한식'],['순두부찌개','한식'],['불고기','한식'],['된장찌개','한식'],
+  ['짜장면','중식'],['짬뽕','중식'],['탕수육','중식'],['마파두부','중식'],['양꼬치','중식'],
+  ['라멘','일식'],['돈카츠','일식'],['초밥','일식'],['회덮밥','일식'],['우동','일식'],
+  ['파스타','양식'],['스테이크','양식'],['리조또','양식'],['함박스테이크','양식'],['피자','양식'],
+  ['떡볶이','분식'],['김밥','분식'],['라면','분식'],['순대','분식'],['만두','분식'],
+  ['쌀국수','아시안'],['팟타이','아시안'],['나시고렝','아시안'],['커리','아시안'],
+  ['샐러드','기타'],['샌드위치','기타'],['부리토','기타'],
+];
+const STORAGE_KEY = 'meal-roulette:v1';
+const HISTORY_MAX = 100;
+
+const uid = p => p + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
+const seedMenus = () => SEED.map(([name, category]) => ({ id: uid('m_'), name, category }));
+const defaultState = () => ({
+  version: 1,
+  menus: seedMenus(),
+  activeCategories: CATEGORIES.slice(),
+  settings: { excludeRecent: 3, wheelSlots: 10 },
+  history: [],
+});
+
+/* ══ 2. 상태 / 저장 ══════════════════════════════════════ */
+let state = defaultState();
+let storageOk = true;
+
+function load(){
+  let raw = null;
+  try { raw = localStorage.getItem(STORAGE_KEY); }
+  catch { storageOk = false; return; }
+  if (!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    const next = defaultState();
+    if (Array.isArray(d.menus)) {
+      next.menus = d.menus
+        .filter(m => m && typeof m.name === 'string' && m.name.trim())
+        .map(m => ({
+          id: typeof m.id === 'string' ? m.id : uid('m_'),
+          name: m.name.trim().slice(0, 20),
+          category: CATEGORIES.includes(m.category) ? m.category : '기타',
+        }));
+    }
+    if (Array.isArray(d.activeCategories)) {
+      const act = d.activeCategories.filter(c => CATEGORIES.includes(c));
+      next.activeCategories = act;               // 빈 배열도 사용자의 선택이므로 존중
+    }
+    if (d.settings) {
+      next.settings.excludeRecent = clamp(Number(d.settings.excludeRecent) || 0, 0, 10);
+      next.settings.wheelSlots = clamp(Number(d.settings.wheelSlots) || 10, 8, 12);
+    }
+    if (Array.isArray(d.history)) {
+      next.history = d.history
+        .filter(h => h && typeof h.name === 'string')
+        .slice(0, HISTORY_MAX)
+        .map(h => ({
+          id: typeof h.id === 'string' ? h.id : uid('h_'),
+          name: h.name,
+          category: CATEGORIES.includes(h.category) ? h.category : '기타',
+          at: typeof h.at === 'string' ? h.at : new Date().toISOString(),
+        }));
+    }
+    state = next;
+  } catch {
+    state = defaultState();           // 깨진 데이터는 기본값으로 복구
+  }
+}
+
+function save(){
+  if (!storageOk) return;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch {
+    storageOk = false;
+    toast('저장 공간을 쓸 수 없어 이번 세션에서만 유지됩니다.');
+  }
+}
+
+/* ══ 3. 순수 로직 ════════════════════════════════════════
+   DOM도 state도 건드리지 않는 함수만 모아 둔 구역.
+   scripts/test.mjs 가 이 블록을 통째로 잘라내 node에서 그대로 검증한다.
+   (마커를 지우거나 블록 안에서 DOM을 쓰면 테스트가 깨진다) */
+/* PURE:START */
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+
+// 모듈로 편향 없는 0 ~ n-1 정수
+function randInt(n){
+  if (n <= 1) return 0;
+  const c = globalThis.crypto;
+  if (!c || !c.getRandomValues) return Math.floor(Math.random() * n);
+  const limit = Math.floor(4294967296 / n) * n;
+  const buf = new Uint32Array(1);
+  let v;
+  do { c.getRandomValues(buf); v = buf[0]; } while (v >= limit);
+  return v % n;
+}
+
+// 부분 Fisher–Yates: 중복 없이 k개 균등 추출
+function sample(arr, k){
+  const pool = arr.slice(), out = [];
+  const take = Math.min(k, pool.length);
+  for (let i = 0; i < take; i++){
+    const j = randInt(pool.length);
+    out.push(pool[j]);
+    pool[j] = pool[pool.length - 1];
+    pool.pop();
+  }
+  return out;
+}
+
+// 원판에 일부만 올려도 전체 후보의 당첨 확률은 균등하다.
+//   (샘플에 포함될 확률 k/n) × (샘플 안에서 뽑힐 확률 1/k) = 1/n
+//
+// 최근 제외로 후보가 0이 되면 N을 1씩 낮춰가며 최소 한 개를 확보한다(relaxed=true).
+function computeCandidates(menus, activeCategories, history, excludeRecent){
+  const inCat = menus.filter(m => activeCategories.includes(m.category));
+  const want = clamp(Number(excludeRecent) || 0, 0, 10);
+  for (let n = want; n > 0; n--){
+    const recent = new Set(history.slice(0, n).map(h => h.name));
+    const list = inCat.filter(m => !recent.has(m.name));
+    if (list.length) return { list, inCat, relaxed: n < want };
+  }
+  return { list: inCat, inCat, relaxed: want > 0 && inCat.length > 0 };
+}
+
+// 당첨을 먼저 정하고 각도를 역산한다: 조각 idx의 중심이 12시 포인터에 오도록
+// 시계방향 누적 회전각을 돌려준다. 항상 현재 각도보다 커서 되감기지 않는다.
+function spinTarget(rotation, idx, k, jitter, turns){
+  const seg = 360 / k;
+  const targetPos = idx * seg + seg / 2 + jitter;   // 12시에서 시계방향으로 잰 당첨 조각 위치
+  const delta = ((((-targetPos) - rotation) % 360) + 360) % 360;
+  return rotation + turns * 360 + delta;
+}
+
+const sliceColor = (i, k) => {
+  const hue = Math.round((i * (360 / Math.max(k, 1)) + 14) % 360);
+  return `hsl(${hue} 66% ${i % 2 === 0 ? 70 : 59}%)`;
+};
+const shortLabel = s => (s.length > 8 ? s.slice(0, 7) + '…' : s);
+/* PURE:END */
+
+const getCandidates = () =>
+  computeCandidates(state.menus, state.activeCategories, state.history, state.settings.excludeRecent);
+
+/* ══ 4. 원판 렌더 ════════════════════════════════════════ */
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+const wheelWrap = canvas.parentElement;
+let slots = [];        // 현재 원판에 올라간 메뉴들
+let slotsSig = '';     // 후보 구성이 바뀌었는지 판별하는 서명
+
+function syncSlots(force){
+  const { list } = getCandidates();
+  const k = Math.min(list.length, state.settings.wheelSlots);
+  const sig = list.map(m => m.id).sort().join('|') + '#' + k;
+  if (force || sig !== slotsSig){
+    slotsSig = sig;
+    slots = sample(list, k);
+  }
+  return list;
+}
+
+function sizeCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  const css = wheelWrap.clientWidth || 320;
+  canvas.width = Math.round(css * dpr);
+  canvas.height = Math.round(css * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return css;
+}
+
+function drawWheel(){
+  const size = sizeCanvas();
+  const r = size / 2, cx = r, cy = r;
+  ctx.clearRect(0, 0, size, size);
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  const k = slots.length;
+  const fs = Math.max(11, Math.round(size * 0.042));
+  const font = `700 ${fs}px -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif`;
+
+  if (k === 0){
+    ctx.beginPath(); ctx.arc(0, 0, r - 2, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsl(30 8% 78%)'; ctx.fill();
+    ctx.fillStyle = '#4a463e'; ctx.font = font;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('후보 없음', 0, r * 0.42);   // 중앙 허브에 가리지 않게
+    ctx.restore();
+    return;
+  }
+
+  const seg = (Math.PI * 2) / k;
+  for (let i = 0; i < k; i++){
+    const a0 = -Math.PI / 2 + i * seg;
+    ctx.beginPath();
+    if (k === 1){
+      ctx.arc(0, 0, r - 2, 0, Math.PI * 2);
+    } else {
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r - 2, a0, a0 + seg);
+      ctx.closePath();
+    }
+    ctx.fillStyle = sliceColor(i, k);
+    ctx.fill();
+    if (k > 1){ ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2; ctx.stroke(); }
+
+    // 라벨: 반지름 방향으로 눕히되, 왼쪽 절반은 뒤집어 읽히게
+    ctx.save();
+    ctx.fillStyle = '#241f17';
+    ctx.font = font;
+    ctx.textBaseline = 'middle';
+    const label = shortLabel(slots[i].name);
+    if (k === 1){
+      ctx.textAlign = 'center';
+      ctx.fillText(label, 0, r * 0.42);
+    } else {
+      const ang = a0 + seg / 2;
+      const norm = ((ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      ctx.rotate(ang);
+      if (norm > Math.PI / 2 && norm < Math.PI * 1.5){
+        ctx.rotate(Math.PI);
+        ctx.textAlign = 'left';
+        ctx.fillText(label, -(r - 16), 0);
+      } else {
+        ctx.textAlign = 'right';
+        ctx.fillText(label, r - 16, 0);
+      }
+    }
+    ctx.restore();
+  }
+
+  ctx.beginPath(); ctx.arc(0, 0, r - 2, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.restore();
+}
+
+/* ══ 5. 스핀 ═════════════════════════════════════════════ */
+const spinBtn = document.getElementById('spin-btn');
+const panel = document.getElementById('panel');
+const modal = document.getElementById('result-modal');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let rotation = 0;       // 누적 회전각(deg) — 되감기 방지
+let spinning = false;
+let spinTimer = null;
+let winner = null;
+
+function setBusy(on){
+  spinBtn.disabled = on;
+  panel.classList.toggle('busy', on);
+}
+
+function spin(){
+  if (spinning || !modalClosed()) return;
+  const list = syncSlots(false);
+  if (!list.length){ toast('돌릴 후보가 없어요. 카테고리를 확인해 주세요.'); return; }
+  // 후보가 원판보다 많을 때만 매번 새로 샘플링한다
+  if (list.length > slots.length) syncSlots(true);
+  drawWheel();
+
+  const k = slots.length;
+  const idx = randInt(k);
+  winner = slots[idx];
+
+  const jitter = k > 1 ? (Math.random() - 0.5) * (360 / k) * 0.7 : 0;
+  rotation = spinTarget(rotation, idx, k, jitter, 4 + randInt(3));   // 4~6바퀴 더 돌고 정확히 멈춤
+
+  spinning = true;
+  setBusy(true);
+  if (reduceMotion){
+    canvas.style.transition = 'none';
+    canvas.style.transform = `rotate(${rotation}deg)`;
+    spinTimer = setTimeout(finishSpin, 120);
+  } else {
+    canvas.style.transition = 'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)';
+    canvas.style.transform = `rotate(${rotation}deg)`;
+    spinTimer = setTimeout(finishSpin, 4400);          // transitionend 유실 대비 안전망
+  }
+}
+
+function finishSpin(){
+  if (!spinning) return;
+  spinning = false;
+  clearTimeout(spinTimer);
+  setBusy(false);
+  openResult(winner);
+}
+
+canvas.addEventListener('transitionend', e => {
+  if (e.propertyName === 'transform') finishSpin();
+});
+
+/* ══ 6. 결과 모달 ════════════════════════════════════════ */
+const modalClosed = () => modal.hidden;
+
+function openResult(m){
+  if (!m) return;
+  document.getElementById('winner-name').textContent = m.name;
+  document.getElementById('winner-cat').textContent = m.category;
+  modal.hidden = false;
+  document.getElementById('confirm-btn').focus();
+}
+function closeResult(){ modal.hidden = true; spinBtn.focus(); }
+
+document.getElementById('confirm-btn').addEventListener('click', () => {
+  if (!winner) return;
+  state.history.unshift({
+    id: uid('h_'), name: winner.name, category: winner.category, at: new Date().toISOString(),
+  });
+  state.history = state.history.slice(0, HISTORY_MAX);
+  save();
+  closeResult();
+  render();
+  toast(`'${winner.name}' 기록했어요. 맛있게 드세요!`);
+});
+document.getElementById('respin-btn').addEventListener('click', () => { closeResult(); spin(); });
+modal.addEventListener('click', e => { if (e.target === modal) closeResult(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !modal.hidden){ closeResult(); return; }
+  if ((e.key === ' ' || e.key === 'Enter') && e.target === document.body && modal.hidden){
+    e.preventDefault(); spin();
+  }
+});
+spinBtn.addEventListener('click', spin);
+
+/* ══ 7. 사이드 패널 ══════════════════════════════════════ */
+// 탭
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(b => {
+      const on = b === btn;
+      b.setAttribute('aria-selected', String(on));
+      document.getElementById(b.getAttribute('aria-controls')).hidden = !on;
+    });
+  });
+});
+
+// 카테고리 체크박스 (한 번만 생성하고 이후엔 상태만 갱신)
+const catList = document.getElementById('cat-list');
+CATEGORIES.forEach(c => {
+  const el = document.createElement('label');
+  el.className = 'cat';
+  el.innerHTML = `<input type="checkbox" value="${c}"><span>${c}</span><span class="cnt" data-cnt="${c}"></span>`;
+  el.querySelector('input').addEventListener('change', e => {
+    const set = new Set(state.activeCategories);
+    e.target.checked ? set.add(c) : set.delete(c);
+    state.activeCategories = CATEGORIES.filter(x => set.has(x));
+    save(); render();
+  });
+  catList.appendChild(el);
+});
+document.getElementById('cat-all').addEventListener('click', () => {
+  state.activeCategories = CATEGORIES.slice(); save(); render();
+});
+document.getElementById('cat-none').addEventListener('click', () => {
+  state.activeCategories = []; save(); render();
+});
+
+// 설정 슬라이더
+const exRecent = document.getElementById('ex-recent');
+const slotsInput = document.getElementById('slots');
+exRecent.addEventListener('input', () => {
+  state.settings.excludeRecent = clamp(Number(exRecent.value), 0, 10);
+  save(); render();
+});
+slotsInput.addEventListener('input', () => {
+  state.settings.wheelSlots = clamp(Number(slotsInput.value), 8, 12);
+  save(); render();
+});
+
+// 메뉴 추가 / 삭제
+const newName = document.getElementById('new-name');
+const newCat = document.getElementById('new-cat');
+CATEGORIES.forEach(c => {
+  const o = document.createElement('option'); o.value = c; o.textContent = c; newCat.appendChild(o);
+});
+
+function addMenu(){
+  const name = newName.value.trim();
+  if (!name){ toast('메뉴 이름을 입력해 주세요.'); newName.focus(); return; }
+  const key = name.replace(/\s+/g, '').toLowerCase();
+  if (state.menus.some(m => m.name.replace(/\s+/g, '').toLowerCase() === key)){
+    toast('이미 있는 메뉴예요.'); newName.select(); return;
+  }
+  state.menus.push({ id: uid('m_'), name, category: newCat.value });
+  newName.value = '';
+  save(); render();
+  toast(`'${name}' 추가했어요.`);
+}
+document.getElementById('add-menu').addEventListener('click', addMenu);
+newName.addEventListener('keydown', e => { if (e.key === 'Enter') addMenu(); });
+document.getElementById('menu-search').addEventListener('input', renderMenus);
+
+// 두 번 눌러야 실행되는 인라인 확인 (브라우저 confirm 대신)
+function armConfirm(btn, onConfirm){
+  if (btn.dataset.armed === '1'){
+    disarm(btn);
+    onConfirm();
+    return;
+  }
+  btn.dataset.label = btn.textContent;
+  btn.dataset.armed = '1';
+  btn.textContent = '한 번 더 누르면 실행';
+  btn.classList.add('armed');
+  btn._t = setTimeout(() => disarm(btn), 6000);   // 읽고 누를 시간
+}
+function disarm(btn){
+  if (btn.dataset.armed !== '1') return;
+  clearTimeout(btn._t);
+  btn.dataset.armed = '';
+  btn.textContent = btn.dataset.label;
+  btn.classList.remove('armed');
+}
+const resetBtn = document.getElementById('reset-menus');
+resetBtn.addEventListener('click', () => armConfirm(resetBtn, () => {
+  state.menus = seedMenus(); save(); render(); toast('기본 메뉴로 되돌렸어요.');
+}));
+const clearBtn = document.getElementById('clear-history');
+clearBtn.addEventListener('click', () => armConfirm(clearBtn, () => {
+  state.history = []; save(); render(); toast('기록을 모두 지웠어요.');
+}));
+
+/* ══ 8. 렌더 ═════════════════════════════════════════════ */
+const fmtDate = new Intl.DateTimeFormat('ko-KR', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+
+function renderFilter(){
+  catList.querySelectorAll('input').forEach(i => { i.checked = state.activeCategories.includes(i.value); });
+  CATEGORIES.forEach(c => {
+    const n = state.menus.filter(m => m.category === c).length;
+    catList.querySelector(`[data-cnt="${c}"]`).textContent = n;
+  });
+  if (document.activeElement !== exRecent) exRecent.value = state.settings.excludeRecent;
+  if (document.activeElement !== slotsInput) slotsInput.value = state.settings.wheelSlots;
+  document.getElementById('ex-recent-val').textContent = state.settings.excludeRecent;
+  document.getElementById('slots-val').textContent = state.settings.wheelSlots;
+}
+
+function renderMenus(){
+  const q = document.getElementById('menu-search').value.trim().toLowerCase();
+  const box = document.getElementById('menu-list');
+  box.innerHTML = '';
+  const hit = state.menus.filter(m => !q || m.name.toLowerCase().includes(q));
+  if (!hit.length){
+    box.innerHTML = `<p class="empty">${state.menus.length ? '검색 결과가 없어요.' : '메뉴가 비어 있어요.<br>위에서 추가하거나 기본 목록으로 되돌려 보세요.'}</p>`;
+    return;
+  }
+  CATEGORIES.forEach(c => {
+    const items = hit.filter(m => m.category === c);
+    if (!items.length) return;
+    const t = document.createElement('p');
+    t.className = 'group-title';
+    t.textContent = `${c} (${items.length})`;
+    box.appendChild(t);
+    const ul = document.createElement('ul');
+    ul.className = 'list';
+    items.forEach(m => {
+      const li = document.createElement('li');
+      li.className = 'item';
+      li.innerHTML = `<span class="name"></span><button class="del" type="button" aria-label="삭제">✕</button>`;
+      li.querySelector('.name').textContent = m.name;
+      li.querySelector('.del').addEventListener('click', () => {
+        state.menus = state.menus.filter(x => x.id !== m.id);
+        save(); render();
+      });
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+  });
+}
+
+function renderHistory(){
+  const box = document.getElementById('history-list');
+  box.innerHTML = '';
+  if (!state.history.length){
+    box.innerHTML = '<p class="empty">아직 기록이 없어요.<br>룰렛을 돌리고 [이거 먹을래]를 누르면 쌓입니다.</p>';
+    return;
+  }
+  const ul = document.createElement('ul');
+  ul.className = 'list';
+  state.history.forEach(h => {
+    const li = document.createElement('li');
+    li.className = 'item';
+    li.innerHTML = `<span class="when"></span><span class="name"></span><span class="tag"></span><button class="del" type="button" aria-label="삭제">✕</button>`;
+    let when = '';
+    try { when = fmtDate.format(new Date(h.at)); } catch { when = ''; }
+    li.querySelector('.when').textContent = when;
+    li.querySelector('.name').textContent = h.name;
+    li.querySelector('.tag').textContent = h.category;
+    li.querySelector('.del').addEventListener('click', () => {
+      state.history = state.history.filter(x => x.id !== h.id);
+      save(); render();
+    });
+    ul.appendChild(li);
+  });
+  box.appendChild(ul);
+}
+
+function renderStatus(list, inCat, relaxed){
+  const msg = document.getElementById('stage-msg');
+  const badge = document.getElementById('candidate-count');
+  badge.innerHTML = `지금 후보 <b>${list.length}</b>개 &nbsp;/&nbsp; 선택한 카테고리의 메뉴 ${inCat.length}개`;
+
+  spinBtn.disabled = spinning || list.length === 0;
+  msg.classList.remove('warn');
+  if (!state.menus.length){
+    msg.textContent = '메뉴가 하나도 없어요. [메뉴] 탭에서 추가해 주세요.';
+    msg.classList.add('warn');
+  } else if (!inCat.length){
+    msg.textContent = '선택한 카테고리에 메뉴가 없어요. [필터] 탭을 확인해 주세요.';
+    msg.classList.add('warn');
+  } else if (relaxed){
+    msg.textContent = `후보가 모자라 최근 제외를 완화했어요 · 후보 ${list.length}개`;
+    msg.classList.add('warn');
+  } else if (state.settings.excludeRecent > 0){
+    msg.textContent = `후보 ${list.length}개 · 최근 ${state.settings.excludeRecent}회 메뉴는 빼고 돌려요`;
+  } else {
+    msg.textContent = `후보 ${list.length}개`;
+  }
+  if (!storageOk) msg.textContent += ' · (저장 불가: 이번 세션에서만 유지)';
+}
+
+function render(){
+  const { list, inCat, relaxed } = getCandidates();
+  renderFilter();
+  renderMenus();
+  renderHistory();
+  renderStatus(list, inCat, relaxed);
+  if (!spinning){ syncSlots(false); drawWheel(); }
+}
+
+/* ══ 9. 토스트 & 초기화 ══════════════════════════════════ */
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
+}
+
+new ResizeObserver(() => drawWheel()).observe(wheelWrap);
+
+load();
+if (!storageOk) console.log('[roulette] localStorage 사용 불가 — 메모리 상태로 동작합니다.');
+render();
+})();
+</script>
+</body>
+</html>
