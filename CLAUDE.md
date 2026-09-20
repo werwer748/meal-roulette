@@ -94,7 +94,8 @@ CDN·웹폰트·이미지를 `src`/`href`로 참조하면 `build`가 실패한�
 실패하면 exit 2로 커밋을 막는다(`.claude/hooks/pre-commit-check.sh`). **git 훅이 아니라 Claude Code 훅**이라
 사람이 터미널에서 직접 치는 커밋은 막지 않는다.
 
-아직 git 저장소가 아니다. `git init` 할 때 `.gitignore`에 `dist/`와 `.idea/`를 넣을 것.
+git 저장소다(`main` 브랜치, 원격 `origin` = https://github.com/werwer748/meal-roulette).
+`.gitignore`는 `dist/`·`.idea/`·`.DS_Store`를 제외한다 — 빌드 산출물은 커밋하지 않는다.
 
 ## 리뷰
 
