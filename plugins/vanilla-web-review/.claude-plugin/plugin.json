@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "vanilla-web-review",
+  "version": "0.1.0",
+  "description": "빌드 도구 없는 바닐라 웹(단일 HTML, 인라인 JS/CSS, Canvas, localStorage) 전용 코드 품질 키트. XSS·저장소 예외·이벤트 누수·애니메이션 경합·무작위 편향·경계값·접근성을 훑는 web-review 스킬, 그 스킬로 리뷰를 수행하고 코드는 고치지 않는 web-reviewer 서브에이전트, 커밋 전에 검사 스크립트를 강제하는 PreToolUse 훅으로 이루어져 있다.",
+  "author": {
+    "name": "hugo"
+  },
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "vanilla-js",
+    "single-file",
+    "canvas",
+    "localstorage",
+    "accessibility"
+  ]
+}
