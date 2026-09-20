@@ -90,8 +90,8 @@ CDN·웹폰트·이미지를 `src`/`href`로 참조하면 `build`가 실패한�
 
 ## 커밋 게이트
 
-`.claude/settings.json`의 PreToolUse(Bash) 훅이 `git commit`을 감지해 `scripts/check.sh`를 돌리고,
-실패하면 exit 2로 커밋을 막는다(`.claude/hooks/pre-commit-check.sh`). **git 훅이 아니라 Claude Code 훅**이라
+`vanilla-web-review` 플러그인의 PreToolUse(Bash) 훅이 `git commit`을 감지해 `scripts/check.sh`를 돌리고,
+실패하면 exit 2로 커밋을 막는다. **git 훅이 아니라 Claude Code 훅**이라
 사람이 터미널에서 직접 치는 커밋은 막지 않는다.
 
 git 저장소다(`main` 브랜치, 원격 `origin` = https://github.com/werwer748/meal-roulette).
@@ -99,5 +99,33 @@ git 저장소다(`main` 브랜치, 원격 `origin` = https://github.com/werwer74
 
 ## 리뷰
 
-프런트엔드 변경 후 리뷰는 `web-reviewer` 서브에이전트에게 맡긴다(`.claude/agents/web-reviewer.md`).
-체크리스트와 보고 형식은 `.claude/skills/web-review/SKILL.md`에 있고, 에이전트가 그 스킬을 호출해 따른다.
+프런트엔드 변경 후 리뷰는 `web-reviewer` 서브에이전트에게 맡긴다. 체크리스트와 보고 형식은
+`web-review` 스킬에 있고, 에이전트가 그 스킬을 호출해 따른다. 에이전트는 코드를 고치지 않고 보고만 한다.
+
+## vanilla-web-review 플러그인
+
+리뷰 스킬·서브에이전트·커밋 훅 셋은 이 저장소 안의 플러그인으로 묶여 있다.
+
+```
+.claude-plugin/marketplace.json          # 마켓플레이스 hugo-web
+plugins/vanilla-web-review/
+  .claude-plugin/plugin.json
+  skills/web-review/SKILL.md             # 리뷰 기준
+  agents/web-reviewer.md                 # 리뷰 실행
+  hooks/hooks.json + pre-commit-check.sh # 커밋 강제
+```
+
+`skills/` · `agents/` · `hooks/hooks.json`은 **관례 경로라 자동으로 로드된다**. plugin.json에 다시
+적으면 훅은 "이미 로드된 파일" 오류가 나고 에이전트는 등록이 누락되므로, 그 키들을 추가하지 말 것.
+
+플러그인 파일을 고쳤으면 캐시(`~/.claude/plugins/cache/hugo-web/…`)에 반영되도록 재설치해야 한다.
+
+```bash
+claude plugin validate ./plugins/vanilla-web-review
+claude plugin uninstall vanilla-web-review --scope project
+claude plugin install vanilla-web-review@hugo-web --scope project
+claude plugin details vanilla-web-review     # Skills 1 / Agents 1 / Hooks 1 인지 확인
+```
+
+훅은 검사 스크립트를 `$VANILLA_WEB_CHECK` → `scripts/check.sh` → `check.sh` 순으로 찾고,
+없으면 통과시킨다. 그래서 다른 프로젝트에 깔아도 안전하다.
